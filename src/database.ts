@@ -1,57 +1,116 @@
-import {Client} from 'pg';
+import uuidv4 = require('uuid/v4');
+import {Pool} from 'pg';
 
-type Id = number;
+import {dbDatabase, dbHost, dbPassword, dbPort, dbUser} from './dbConfig';
 
-class User {
-    private id: Id;
-    private username: string;
+import {tierListsSchema} from './schemas';
+
+// DB Types
+
+type Id = string;
+
+interface TierList {
+    readonly id: Id;
+    readonly title: string;
+    readonly description: string;
+    readonly tiers: Tier[];
 }
 
-class TierList {
-    private id: Id;
-    private displayName: string;
-    private description: string;
-    private tiers: Tier[];
+function defaultTierList(title: string, description: string): TierList {
+    return {
+        id: uuidv4(),
+        title,
+        description,
+        tiers: [
+            {title: "S", color: "rgb(137,243,255)", items: []},
+            {title: "A", color: "rgb(82,255,98)", items: []},
+            {title: "B", color: "rgb(229,255,145)", items: []},
+            {title: "C", color: "rgb(255,205,99)", items: []},
+            {title: "D", color: "rgb(255,183,149)", items: []},
+        ]
+    };
+}
 
-    private constructor(id: number, displayName: string, description: string, tiers: Tier[]) {
-        this.id = id;
-        this.displayName = displayName;
-        this.description = description;
-        this.tiers = tiers;
+interface Tier {
+    readonly title: string;
+    readonly description?: string;
+    readonly color: string;
+    readonly items: Item[];
+}
+
+interface Item {
+    readonly title: string;
+    readonly description?: string;
+    readonly imageUrl?: string;
+}
+
+
+// API types
+
+interface TierListInfo {
+    readonly title: string;
+    readonly description?: string;
+}
+
+
+// Pool setup
+
+const pool = Pool({
+    user: dbUser,
+    host: dbHost,
+    database: dbDatabase,
+    password: dbPassword,
+    port: dbPort,
+});
+
+pool.on('error', (err, client) => {
+    console.error("Pooling error:", err);
+});
+
+
+// API functions
+
+export async function setupDatabase() {
+    await pool.query(tierListsSchema);
+}
+
+export async function createTierList(tierListInfo: TierListInfo) {
+    const tierList = defaultTierList(tierListInfo.title, tierListInfo.description);
+
+    const res = await pool.query(
+        'INSERT INTO tierlists(id, title, description, tiers) VALUES($1, $2, $3, $4) RETURNING *',
+        [tierList.id, tierList.title, tierList.description, JSON.stringify(tierList.tiers)]
+    );
+
+    if (res.rowCount != 1) {
+        console.error(`INSERT query returned ${res.rowCount} rows`);
+        console.log(res);
+        return {
+            success: false,
+        };
     }
 
-    public static fromRow(row: any): TierList {
-        return new TierList(row.id, row.displayName, row.description, []);
-    }
+    return {
+        success: true,
+        tierlist: res.rows[0]
+    };
+
 }
-
-class Tier {
-    private id: Id;
-    private displayName: string;
-    private description: string;
-    private color: string;
-    private items: Item[];
-}
-
-class Item {
-    id: Id;
-    displayName: string;
-    description: string;
-    imageUrl: string;
-
-    constructor(id: number, displayName: string, description: string = null, imageUrl: string = null) {
-        this.id = id;
-        this.displayName = displayName;
-        this.description = description;
-        this.imageUrl = imageUrl;
-    }
-}
-
-const client = Client();
 
 export async function getAllTierLists(): Promise<TierList[]> {
-    await client.connect();
-    const res = await client.query('SELECT * from tierlists;');
+    const res = await pool.query('SELECT * FROM tierlists');
 
-    return res.rows.map(row => TierList.fromRow(row));
+    return res.rows;
+}
+
+export async function getTierList(id: Id): Promise<TierList> {
+    console.log(id);
+    const res = await pool.query(
+        'SELECT * FROM tierlists WHERE id = $1',
+        [id]
+    );
+
+    console.log(res);
+
+    return res.rows[0];
 }

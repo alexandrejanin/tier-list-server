@@ -1,35 +1,42 @@
 import * as bodyParser from 'body-parser';
 import * as express from 'express';
-
-import {getAllTierLists} from "./database";
+import {createTierList, getAllTierLists, getTierList, setupDatabase} from "./database";
 
 const app = express();
 
-app.use((request: express.Request, response: express.Response, next) => {
+const apiPort = 3000;
+
+app.use((request, response, next) => {
     console.log(`${request.method} ${request.path}`);
     next();
 });
 
 app.use(bodyParser.json());
 
-app.get('/', (request: express.Request, response: express.Response) => {
+app.get('/', (request, response) => {
     response.send('Hello world!');
 });
 
-app.get('/tierlists', (request: express.Request, response: express.Response) => {
-    const tierLists = getAllTierLists();
+app.get('/tierlists', async (request, response) => {
+    const tierLists = await getAllTierLists();
 
-    response
-        .set('Content-Type', 'application/json')
-        .send(tierLists);
+    response.json(tierLists);
 });
 
-app.get('/tierlists/:id', (request: express.Request, response: express.Response) => {
-    response.send(`Tier List ${request.params.id}`);
+app.post('/tierlists', async (request, response) => {
+    const res = await createTierList(request.body);
+    response.json(res);
 });
 
-app.get('/tierlists/:id/:field', (request: express.Request, response: express.Response) => {
-    response.send(`Field ${request.params.field} of tier list ${request.params.id}`);
+app.get('/tierlists/:id', async (request, response) => {
+    const res = await getTierList(request.params.id);
+    response.json(res);
 });
 
-app.listen(3000);
+setupDatabase()
+    .then(() => {
+        console.log("Database setup OK");
+        app.listen(apiPort);
+        console.log("Server listening on port", apiPort);
+    })
+    .catch(err => console.error("Database setup ERROR:", err));
