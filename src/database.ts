@@ -1,4 +1,4 @@
-import uuidv4 = require('uuid/v4');
+import * as uuidv4 from 'uuid/v4';
 import {Pool} from 'pg';
 
 import {dbDatabase, dbHost, dbPassword, dbPort, dbUser} from './dbConfig';
@@ -9,26 +9,26 @@ import {tierListsSchema} from './schemas';
 
 type Id = string;
 
-interface TierList {
+class TierList {
     readonly id: Id;
     readonly title: string;
-    readonly description: string;
+    readonly description?: string;
+    readonly imageSource?: string;
     readonly tiers: Tier[];
-}
 
-function defaultTierList(title: string, description: string): TierList {
-    return {
-        id: uuidv4(),
-        title,
-        description,
-        tiers: [
-            {title: "S", color: "rgb(137,243,255)", items: []},
-            {title: "A", color: "rgb(82,255,98)", items: []},
-            {title: "B", color: "rgb(229,255,145)", items: []},
-            {title: "C", color: "rgb(255,205,99)", items: []},
-            {title: "D", color: "rgb(255,183,149)", items: []},
-        ]
-    };
+    constructor({title, description, imageSource}: TierListInfo) {
+        this.id = uuidv4();
+        this.title = title;
+        this.description = description;
+        this.imageSource = imageSource;
+        this.tiers = [
+            {title: "S", color: "#ff7e7f", items: []},
+            {title: "A", color: "#ffbf81", items: []},
+            {title: "B", color: "#ffff80", items: []},
+            {title: "C", color: "#80ff80", items: []},
+            {title: "D", color: "#7fbfff", items: []},
+        ];
+    }
 }
 
 interface Tier {
@@ -41,7 +41,7 @@ interface Tier {
 interface Item {
     readonly title: string;
     readonly description?: string;
-    readonly imageUrl?: string;
+    readonly imageSource?: string;
 }
 
 
@@ -50,12 +50,19 @@ interface Item {
 interface TierListInfo {
     readonly title: string;
     readonly description?: string;
+    readonly imageSource?: string;
+}
+
+interface Result<T> {
+    success: boolean;
+    error?: string;
+    result?: T;
 }
 
 
 // Pool setup
 
-const pool = Pool({
+const pool = new Pool({
     user: dbUser,
     host: dbHost,
     database: dbDatabase,
@@ -74,12 +81,12 @@ export async function setupDatabase() {
     await pool.query(tierListsSchema);
 }
 
-export async function createTierList(tierListInfo: TierListInfo) {
-    const tierList = defaultTierList(tierListInfo.title, tierListInfo.description);
+export async function createTierList(tierListInfo: TierListInfo): Promise<Result<TierList>> {
+    const tierList = new TierList(tierListInfo);
 
     const res = await pool.query(
-        'INSERT INTO tierlists(id, title, description, tiers) VALUES($1, $2, $3, $4) RETURNING *',
-        [tierList.id, tierList.title, tierList.description, JSON.stringify(tierList.tiers)]
+        'INSERT INTO tierlists(id, title, description, imageSource, tiers) VALUES($1, $2, $3, $4, $5) RETURNING *',
+        [tierList.id, tierList.title, tierList.description, tierList.imageSource, JSON.stringify(tierList.tiers)],
     );
 
     if (res.rowCount != 1) {
@@ -92,25 +99,53 @@ export async function createTierList(tierListInfo: TierListInfo) {
 
     return {
         success: true,
-        tierlist: res.rows[0]
+        result: res.rows[0],
     };
 
 }
 
-export async function getAllTierLists(): Promise<TierList[]> {
+export async function getAllTierLists(): Promise<Result<TierList[]>> {
     const res = await pool.query('SELECT * FROM tierlists');
 
-    return res.rows;
+    return {
+        success: true,
+        result: res.rows,
+    };
 }
 
-export async function getTierList(id: Id): Promise<TierList> {
-    console.log(id);
+export async function getTierList(id: Id): Promise<Result<TierList>> {
     const res = await pool.query(
         'SELECT * FROM tierlists WHERE id = $1',
-        [id]
+        [id],
     );
 
-    console.log(res);
+    if (res.rowCount == 0) {
+        return {
+            success: false,
+            error: `No tier list found with id ${id}`,
+        }
+    }
 
-    return res.rows[0];
+    return {
+        success: true,
+        result: res.rows[0],
+    };
+}
+
+export async function deleteTierList(id: Id): Promise<Result<string>> {
+    const res = await pool.query(
+        'DELETE FROM tierlists WHERE id = $1',
+        [id],
+    );
+
+    if (res.rowCount == 0) {
+        return {
+            success: false,
+            error: `No tier list found with id ${id}`,
+        }
+    }
+
+    return {
+        success: true,
+    };
 }
