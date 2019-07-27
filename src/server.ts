@@ -1,6 +1,6 @@
 import * as bodyParser from 'body-parser';
 import * as express from 'express';
-import {createTierList, deleteTierList, getAllTierLists, getTierList, setupDatabase} from "./database";
+import {createTierList, deleteTierList, getAllTierLists, getTierList, setupDatabase, updateTierList} from "./database";
 
 const app = express();
 
@@ -33,7 +33,13 @@ app.post('/tierlists', async (request: express.Request, response: express.Respon
 
 // Get tier list by ID
 app.get('/tierlists/:id', async (request: express.Request, response: express.Response) => {
-    const res = await getTierList(request.params.id);
+    const tierList = await getTierList(request.params.id);
+    response.json(tierList);
+});
+
+// Update tier list by ID
+app.put('tierlists/:id', async (request: express.Request, response: express.Response) => {
+    const res = await updateTierList(request.params.id, request.body.tierList);
     response.json(res);
 });
 

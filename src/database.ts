@@ -18,7 +18,7 @@ class TierList {
 
     constructor({title, description, imageSource}: TierListInfo) {
         this.id = uuidv4();
-        this.title = title;
+        this.title = title.trim();
         this.description = description;
         this.imageSource = imageSource;
         this.tiers = [
@@ -53,10 +53,24 @@ interface TierListInfo {
     readonly imageSource?: string;
 }
 
-interface Result<T> {
-    success: boolean;
-    error?: string;
-    result?: T;
+class Result<T> {
+    readonly success: boolean = false;
+    readonly error?: string;
+    readonly result?: T;
+
+    public static success<T>(result?: T): Result<T> {
+        return {
+            success: true,
+            result
+        };
+    }
+
+    public static error<T>(error?: string): Result<T> {
+        return {
+            success: true,
+            error
+        };
+    }
 }
 
 
@@ -82,6 +96,10 @@ export async function setupDatabase() {
 }
 
 export async function createTierList(tierListInfo: TierListInfo): Promise<Result<TierList>> {
+    if (!tierListInfo.title || tierListInfo.title.trim().length == 0) {
+        return Result.error("Title cannot be empty");
+    }
+
     const tierList = new TierList(tierListInfo);
 
     const res = await pool.query(
@@ -92,25 +110,16 @@ export async function createTierList(tierListInfo: TierListInfo): Promise<Result
     if (res.rowCount != 1) {
         console.error(`INSERT query returned ${res.rowCount} rows`);
         console.log(res);
-        return {
-            success: false,
-        };
+        return Result.error("Error while creating tier list");
     }
 
-    return {
-        success: true,
-        result: res.rows[0],
-    };
-
+    return Result.success(res.rows[0]);
 }
 
 export async function getAllTierLists(): Promise<Result<TierList[]>> {
     const res = await pool.query('SELECT * FROM tierlists');
 
-    return {
-        success: true,
-        result: res.rows,
-    };
+    return Result.success(res.rows);
 }
 
 export async function getTierList(id: Id): Promise<Result<TierList>> {
@@ -120,16 +129,23 @@ export async function getTierList(id: Id): Promise<Result<TierList>> {
     );
 
     if (res.rowCount == 0) {
-        return {
-            success: false,
-            error: `No tier list found with id ${id}`,
-        }
+        return Result.error(`No tier list found with id ${id}`);
     }
 
-    return {
-        success: true,
-        result: res.rows[0],
-    };
+    return Result.success(res.rows[0]);
+}
+
+export async function updateTierList(id: Id, tierList: TierList): Promise<Result<TierList>> {
+    const res = await pool.query(
+        'UPDATE tierlists SET title = $2, description = $3, imageSource = $4, tiers = $5 WHERE id = $1 RETURNING *',
+        [tierList.id, tierList.title, tierList.description, tierList.imageSource, JSON.stringify(tierList.tiers)]
+    );
+
+    if (res.rowCount == 0) {
+        return Result.error(`No tier list found with id ${id}`);
+    }
+
+    return Result.success(res.rows[0]);
 }
 
 export async function deleteTierList(id: Id): Promise<Result<string>> {
@@ -139,13 +155,8 @@ export async function deleteTierList(id: Id): Promise<Result<string>> {
     );
 
     if (res.rowCount == 0) {
-        return {
-            success: false,
-            error: `No tier list found with id ${id}`,
-        }
+        return Result.error(`No tier list found with id ${id}`);
     }
 
-    return {
-        success: true,
-    };
+    return Result.success();
 }
