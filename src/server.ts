@@ -16,37 +16,37 @@ app.use(bodyParser.json());
 
 // Get API status
 app.get('/', (request: express.Request, response: express.Response) => {
-    response.send('OK');
+    response.send('Server status OK');
 });
 
 // Get all tier lists
 app.get('/tierlists', async (request: express.Request, response: express.Response) => {
-    const tierLists = await getAllTierLists();
-    response.json(tierLists);
+    const result = await getAllTierLists();
+    result.sendResponse(response);
 });
 
 // Create and return new tier list
 app.post('/tierlists', async (request: express.Request, response: express.Response) => {
-    const res = await createTierList(request.body);
-    response.json(res);
+    const result = await createTierList(request.body);
+    result.sendResponse(response);
 });
 
 // Get tier list by ID
 app.get('/tierlists/:id', async (request: express.Request, response: express.Response) => {
-    const tierList = await getTierList(request.params.id);
-    response.json(tierList);
+    const result = await getTierList(request.params.id);
+    result.sendResponse(response);
 });
 
 // Update tier list by ID
 app.put('tierlists/:id', async (request: express.Request, response: express.Response) => {
-    const res = await updateTierList(request.params.id, request.body.tierList);
-    response.json(res);
+    const result = await updateTierList(request.params.id, request.body.tierList);
+    result.sendResponse(response);
 });
 
 // Delete tier list by ID
 app.delete('/tierlists/:id', async (request: express.Request, response: express.Response) => {
-    const res = await deleteTierList(request.params.id);
-    response.json(res);
+    const result = await deleteTierList(request.params.id);
+    result.sendResponse(response);
 });
 
 setupDatabase()
