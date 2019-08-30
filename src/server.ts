@@ -38,7 +38,7 @@ app.get('/tierlists/:id', async (request: express.Request, response: express.Res
 });
 
 // Update tier list by ID
-app.put('tierlists/:id', async (request: express.Request, response: express.Response) => {
+app.put('/tierlists/:id', async (request: express.Request, response: express.Response) => {
     const result = await updateTierList(request.params.id, request.body.tierList);
     result.sendResponse(response);
 });
